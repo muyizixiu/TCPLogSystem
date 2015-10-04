@@ -6,7 +6,12 @@ import (
 	"io"
 	"net"
 	"regexp"
+	"runtime"
 )
+
+func init() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+}
 
 var (
 	addr       string
@@ -18,11 +23,11 @@ var (
 type server struct {
 	flag     bool
 	Err      error
-	Data     chan [config.MaxNumberOfData][]byte
+	Data     chan []byte
 	listener net.Listener
 }
 
-func (s server) GetDataChannel() chan [config.MaxNumberOfData][]byte {
+func (s server) GetDataChannel() chan []byte {
 	return s.Data
 }
 
@@ -34,10 +39,14 @@ func NewServer() *server {
 	return &onlyServer
 }
 func init() {
-	HTTP_r, _ = regexp.Compile(`^HTTP`)
-	onlyServer = server{flag: true, Data: make(chan [config.MaxNumberOfData][]byte)}
+	initData()
+	HTTP_r, _ = regexp.Compile(`HTTP[^(\r\n)]+\r\n`)
+	onlyServer = server{flag: true, Data: make(chan []byte, config.MaxNumberOfData)}
 }
-func initData() {}
+func initData() {
+	addr = ""
+	port = "80"
+}
 func checkErr(err error) bool {
 	if err != nil {
 		dealError(err)
@@ -78,15 +87,26 @@ func accept(l net.Listener, h connHandler) {
 func (s server) accept() {
 	accept(s.listener, s)
 }
+
+type HTTPHandler interface {
+	dealHTTP()
+}
+
 func (s server) dealConn(c net.Conn) {
 	data, err := read(c)
+	if err != nil {
+		s.Err = err
+		c.Close()
+		return
+	}
 	switch parse(data) {
 	case "HTTP":
-		dealHTTP(c)
+		h := HTTPHandler(newHTTP(c))
+		h.dealHTTP()
 	}
+	c.Close()
 }
 func parse(data []byte) string {
-	fmt.Println(string(data))
 	if isHTTP(data) {
 		return "HTTP"
 	}
