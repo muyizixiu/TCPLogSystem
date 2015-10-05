@@ -2,14 +2,13 @@ package server
 
 import (
 	"errors"
-	"net"
 	"regexp"
 )
 
 var httpHead_r *regexp.Regexp
 
 func init() {
-	httpHead_r, _ = regexp.Compile(`^HTTP[^(\r\n\r\n]+\r\n\r\n`)
+	httpHead_r, _ = regexp.Compile(`[(POST)(OPTIONS)] / HTTP/1.1[\s\S]*?(\r\n){2,}`)
 }
 
 type HTTP struct {
@@ -17,18 +16,19 @@ type HTTP struct {
 	head   []byte
 	origin []byte
 	data   json
-	conn   net.Conn
+	conn   *Conn
 	err    error
 }
 
-func newHTTP(c net.Conn) *HTTP {
-	return &HTTP{ip: c.RemoteAddr().String(), conn: c}
+func newHTTP(c *Conn) *HTTP {
+	return &HTTP{ip: c.conn.RemoteAddr().String(), conn: c}
 }
 func (h *HTTP) dealHTTP() {
-	go h.readData()
+	h.origin = h.conn.buffer
 	h.reply()
 	h.readHead()
 	if h.err != nil {
+		dealError(h.err)
 		return
 	}
 	(newJson(h.origin[len(h.head):], h.ip)).send()
@@ -38,7 +38,8 @@ func (h *HTTP) close() {
 }
 func (h *HTTP) readData() {
 	var buffer []byte
-	part, err := read(h.conn)
+	err := h.conn.readAll()
+	part := h.conn.buffer
 	if err != nil {
 		h.close()
 		h.err = err
@@ -47,7 +48,7 @@ func (h *HTTP) readData() {
 	h.origin = append(buffer, part...)
 }
 func (h *HTTP) reply() {
-	h.conn.Write([]byte("HTTP/1.1 200 OK\r\nData: Sun, 04 Oct 2015 09:07:00\r\n\r\n"))
+	h.conn.conn.Write([]byte("HTTP/1.1 200 OK\r\nData: Sun, 04 Oct 2015 09:07:00\r\n\r\n"))
 	h.close()
 }
 func (h *HTTP) readHead() {

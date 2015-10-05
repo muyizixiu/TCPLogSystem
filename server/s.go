@@ -93,15 +93,16 @@ type HTTPHandler interface {
 }
 
 func (s server) dealConn(c net.Conn) {
-	data, err := read(c)
+	con := &Conn{conn: c}
+	data, err := con.read()
 	if err != nil {
 		s.Err = err
-		c.Close()
+		con.Close()
 		return
 	}
 	switch parse(data) {
 	case "HTTP":
-		h := HTTPHandler(newHTTP(c))
+		h := HTTPHandler(newHTTP(con))
 		h.dealHTTP()
 	}
 	c.Close()
@@ -135,4 +136,29 @@ func read(c net.Conn) ([]byte, error) {
 		}
 	}
 	return result, nil
+}
+
+type Conn struct {
+	conn   net.Conn
+	buffer []byte
+}
+
+func (c *Conn) readAll() error {
+	buf, err := read(c.conn)
+	if err != nil {
+		return err
+	}
+	c.buffer = append(c.buffer, buf...)
+	return nil
+}
+func (c *Conn) read() ([]byte, error) {
+	buf, err := read(c.conn)
+	if err != nil {
+		return nil, err
+	}
+	c.buffer = append(c.buffer, buf...)
+	return buf, nil
+}
+func (c Conn) Close() {
+	c.conn.Close()
 }
