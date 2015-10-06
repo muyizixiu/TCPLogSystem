@@ -88,8 +88,8 @@ func (s server) accept() {
 	accept(s.listener, s)
 }
 
-type HTTPHandler interface {
-	dealHTTP()
+type TCPHandler interface {
+	dealTCP()
 }
 
 func (s server) dealConn(c net.Conn) {
@@ -102,8 +102,11 @@ func (s server) dealConn(c net.Conn) {
 	}
 	switch parse(data) {
 	case "HTTP":
-		h := HTTPHandler(newHTTP(con))
-		h.dealHTTP()
+		h := TCPHandler(newHTTP(con))
+		h.dealTCP()
+	case "TCP":
+		h := TCPHandler(newTCP(con))
+		h.dealTCP()
 	}
 	c.Close()
 }
@@ -111,7 +114,7 @@ func parse(data []byte) string {
 	if isHTTP(data) {
 		return "HTTP"
 	}
-	return "unkown"
+	return "TCP"
 }
 func isHTTP(data []byte) bool {
 	if HTTP_r.Find(data) != nil {
