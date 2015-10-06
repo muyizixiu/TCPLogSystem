@@ -23,6 +23,9 @@ type HTTP struct {
 func newHTTP(c *Conn) *HTTP {
 	return &HTTP{ip: c.conn.RemoteAddr().String(), conn: c}
 }
+func (h *HTTP) dealTCP() {
+	h.dealHTTP()
+}
 func (h *HTTP) dealHTTP() {
 	h.origin = h.conn.buffer
 	h.reply()
