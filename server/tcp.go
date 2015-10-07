@@ -13,6 +13,7 @@ var (
 	lengthErr    = errors.New("wrong length")
 	checkCode    = byte(12)
 	checkCodeErr = errors.New("content error")
+	MaxLengthErr = errors.New("out of MaxLength")
 )
 
 type TCP struct {
@@ -71,8 +72,15 @@ func (t *TCP) readData() {
 		t.err = err
 		t.close()
 	}
+	if len(data) > bufferSize {
+		t.err = MaxLengthErr
+		return
+	}
 	t.bufferLock.Lock()
 	t.buffer = append(t.buffer, data...)
+	if len(t.buffer) > bufferSize {
+		t.err = MaxLengthErr
+	}
 	t.bufferLock.Unlock()
 }
 func (t *TCP) close() {
